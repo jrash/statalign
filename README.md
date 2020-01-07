@@ -6,7 +6,7 @@ The primary change to the model is in `StructAlign.java` [here](https://github.c
 
 A write up of the original model is described in the original [paper](https://academic.oup.com/mbe/article/31/9/2251/2925747). 
 
-`Herman_et_al_improved_insertion.pdf` contains write up of our modification to the model.
+The [write up](https://github.com/jrash/statalign/blob/master/Herman_et_al_improved_insertion.pdf) of our modification to the model.
 
 ## StatAlign v3.2
 
