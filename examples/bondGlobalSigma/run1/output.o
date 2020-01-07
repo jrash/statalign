@@ -1,0 +1,6 @@
+StatAlign v3.2b
+Verbose output enabled.
+Successfully read 5_globins.fasta using FastaReader
+Successfully read 5_globins.coor using CoorReader
+Automatically selected Dayhoff as substitution model.
+statalign: Log file entry code list not recognised: E,T,ST,P,A,B,S,R,SI,C,L,N

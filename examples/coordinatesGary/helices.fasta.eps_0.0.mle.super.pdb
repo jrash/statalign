@@ -1,0 +1,56 @@
+HEADER 1lh1
+ATOM      1  CA  SER A   1      18.465  -1.415   3.891
+ATOM      2  CA  GLU A   2      16.465   1.132   5.401
+ATOM      3  CA  GLU A   3      16.032   2.656   2.054
+ATOM      4  CA  LEU A   4      14.433  -0.814   0.753
+ATOM      5  CA  ASN A   5      12.035  -1.343   3.679
+ATOM      6  CA  SER A   6      11.105   2.146   3.160
+ATOM      7  CA  ALA A   7      10.495   1.472  -0.539
+ATOM      8  CA  TRP A   8       8.035  -1.851  -0.083
+ATOM      9  CA  THR A   9       6.313  -0.153   2.783
+ATOM     10  CA  ILE A  10       5.481   2.757   0.707
+ATOM     11  CA  ALA A  11       4.329   0.495  -2.252
+ATOM     12  CA  TYR A  12       1.978  -1.898   0.010
+ATOM     13  CA  ASP A  13       0.599   0.971   1.841
+ATOM     14  CA  GLU A  14      -0.163   2.700  -1.453
+ATOM     15  CA  LEU A  15      -1.814  -0.529  -3.071
+ATOM     16  CA  ALA A  16      -3.863  -1.474   0.119
+ATOM     17  CA  ILE A  17      -5.208   1.912   0.159
+ATOM     18  CA  VAL A  18      -6.581   1.118  -3.378
+ATOM     19  CA  ILE A  19      -8.219  -2.471  -2.635
+ATOM     20  CA  LYS A  20      -9.758  -1.425   0.646
+ATOM     21  CA  LYS A  21     -11.251   1.242  -1.238
+ATOM     22  CA  GLU A  22     -12.868  -1.284  -3.737
+ATOM     23  CA  MET A  23     -14.169  -3.722  -0.964
+ATOM     24  CA  ASP A  24     -15.921  -1.090   0.660
+ATOM     25  CA  ASP A  25     -17.489  -0.548  -2.632
+ATOM     26  CA  ALA A  26     -18.411  -4.318  -3.251
+ATOM     27  CA  ALA A  27     -20.294  -4.572   0.070
+TER      28      ALA A  27
+HEADER 2hbg
+ATOM      1  CA  ALA B   1      16.606   0.018   5.325
+ATOM      2  CA  ALA B   2      15.797   1.524   1.902
+ATOM      3  CA  ALA B   3      13.896  -1.648   0.805
+ATOM      4  CA  LYS B   4      11.867  -1.827   4.045
+ATOM      5  CA  ASP B   5      10.879   1.870   3.670
+ATOM      6  CA  ALA B   6       9.975   1.445  -0.014
+ATOM      7  CA  TRP B   7       7.979  -1.794   0.406
+ATOM      8  CA  ALA B   8       6.007  -0.312   3.372
+ATOM      9  CA  ALA B   9       5.060   2.639   1.091
+ATOM     10  CA  ALA B  10       4.318   0.287  -1.869
+ATOM     11  CA  TYR B  11       2.080  -1.917   0.364
+ATOM     12  CA  ALA B  12       0.244   1.136   1.710
+ATOM     13  CA  ASP B  13      -0.573   2.266  -1.871
+ATOM     14  CA  ILE B  14      -1.523  -1.234  -3.059
+ATOM     15  CA  SER B  15      -3.664  -2.162  -0.034
+ATOM     16  CA  GLY B  16      -5.073   1.406   0.118
+ATOM     17  CA  ALA B  17      -6.309   1.110  -3.498
+ATOM     18  CA  LEU B  18      -7.914  -2.314  -2.866
+ATOM     19  CA  ILE B  19      -9.671  -1.035   0.249
+ATOM     20  CA  SER B  20     -10.994   1.942  -1.744
+ATOM     21  CA  GLY B  21     -12.670  -0.490  -4.216
+ATOM     22  CA  LEU B  22     -13.797  -2.804  -1.391
+ATOM     23  CA  GLN B  23     -15.519   0.167   0.321
+ATOM     24  CA  SER B  24     -17.002   1.727  -2.819
+TER      25      SER B  24
+END
