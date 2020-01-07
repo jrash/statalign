@@ -31,26 +31,24 @@ public class StatAlign{
 
 	public static final int majorVersion = 3;
 	public static final int minorVersion = 2;
-	public static final String version = "v3.2";
+	public static final String version = "v3.2b";
 	
 	public static boolean allowVersionCheck = true;
 	
 	public static final String webPageURL = "http://statalign.github.io/";
 
-	/** 
-	 * If command line arguments are provided, terminal mode is launched
-	 * (without graphical interface). Running with no arguments launches 
-	 * the GUI version of the program.
+	/**
+	 * Only method of the class.
+	 * If a Fasta input file is given as argument, it runs in terminal mode
+	 * (without graphical interface), otherwise it launches the main GUI
+	 * of the program.
 	 * 
-	 * Information on command line options can be obtained by running
-	 * 
-	 * java -jar StatAlign.jar -help
-	 * 
-	 * @param args (optional)
+	 * @param args [0]: the input file name containing the sequences in Fasta format
 	 * @throws IOException
 	 */
 	public static void main(String args[]) {
 					
+		
 		System.out.println("StatAlign "+version);
 		
 		if(args.length != 0) {

@@ -129,6 +129,17 @@ public class Funcs{
 			inds.add(v.index);
 	}
 	
+	public static void printMatrix(double[][] ls) {
+
+		for (int i = 0; i < ls.length; i++) {
+			for (int j = 0; j < ls[i].length; j++) {
+				System.out.print(ls[i][j] + "\t");
+			}
+			System.out.println();
+		}
+
+	}
+	
 	public static void writeRotationFiles(Tree tree, double[][][] coords, 
 			double[][] xlats, double[][] axes, double[] angles){
 		try{
@@ -213,6 +224,43 @@ public class Funcs{
 		return sub;
 	}
 
+	/**
+	 * For an n X 3 coordinate matrix, calculate the 1 X 3 mean vector using only aligned positions
+	 * @param A - coordinate matrix
+	 * @return mean vector
+	 */
+	
+	//Test this
+	
+	public static RealVector meanVectorAligned(RealMatrix A, String[] align, int seq){
+		
+		RealVector mean = new ArrayRealVector(new double[3]);
+		
+		boolean ngap, mgap, curSeqGap;
+		int aaIdx = 0, aligned = 0;
+		for(int j = 0; j < align[0].length(); j++){
+			ngap = align[0].charAt(j) == '-';
+			mgap = align[1].charAt(j) == '-';
+			curSeqGap = align[seq].charAt(j) == '-';
+			if(!ngap & !mgap){
+				aligned++;
+				for(int i = 0; i < 3; i ++){
+					mean.addToEntry(i, A.getEntry(aaIdx,i));
+				}
+			}	
+			if(!curSeqGap)
+				aaIdx++;
+		}
+		
+		for(int i = 0; i < 3; i ++){
+			mean.setEntry(i, mean.getEntry(i) / aligned);
+		}
+		return mean;
+	}
+
+	
+	
+	
 }
 
 

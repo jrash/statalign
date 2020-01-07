@@ -4,10 +4,12 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.text.FieldPosition;
 import java.util.ArrayList;
+
 import static java.util.Arrays.*;
 import static statalign.base.AlignColumn.*;
-
+import statalign.model.ext.plugins.StructAlign;
 import statalign.ui.ErrorMessage;
+import statalign.model.ext.plugins.structalign.Funcs;
 
 /**
  * This is a vertex of the tree.
@@ -20,6 +22,7 @@ import statalign.ui.ErrorMessage;
  */
 public class Vertex {
 
+	StructAlign structAlign;
 	/** The number of digits in rounding when printing the tree. */
     static final int ROUNDING = 100; 
     /** The probability for selecting a homologous column not to be 
@@ -1775,7 +1778,7 @@ public class Vertex {
 	    	System.out.println(owner.hmm2.params[0]+" "+owner.hmm2.params[1]+" "+owner.hmm2.params[2]);
 	    	System.out.println(owner.printedTreeWithNumbers());
     	}
-        //if (Utils.DEBUG) printToScreenAlignment(0,0,true);
+//        if (Utils.DEBUG) printToScreenAlignment(0,0,true);
     	//printToScreenAlignment(0,0,true);
     	StringBuffer sb = new StringBuffer();
     	
@@ -1875,7 +1878,7 @@ public class Vertex {
 //        	updateAlignedRecursively();
 //        	updateAlignedParent();
 //        }
-        
+        if (Utils.DEBUG) printToScreenAlignment(0,0,true);
         //printToScreenAlignment(b,b+winLength);
         // compute alignment backproposal
         //bpp += doRecBackprop();
@@ -1889,6 +1892,7 @@ public class Vertex {
         	bpp += hmm2BackProp;
         }
 
+        
         // align the sequences
         double bppProp = doRecAlign();
         if (Utils.DEBUG) System.out.println("bppProp after doRecAlign()\t "+bppProp);
@@ -2307,6 +2311,7 @@ public class Vertex {
             // but if they're not then very occasionally there are inconsistencies.
             calcOrphan();            
             calcAllUp();
+           
         }
      
         //indelLogLike = old.indelLogLike;
@@ -2319,6 +2324,8 @@ public class Vertex {
 //        	owner.root.calcUpperRecursively();
 //        }   
 //        owner.root.recomputeCheckLogLike();
+        if (Utils.DEBUG) System.out.println("restore");
+        if (Utils.DEBUG) printToScreenAlignment(0,0,true);
     }
 
     /**
@@ -5986,6 +5993,29 @@ public class Vertex {
     		}
     		System.out.println(String.format("%-8s", n)+"\t"+s[ii]);
     	}
+    	
+//    	if(structAlign != null){
+//    		System.out.println("The structure loglikelihood is:\t" + structAlign.calcAllColumnContrib());
+//    		System.out.println("coordinates:\n");
+//    		int n = 0;
+//    		double[][][] coor = structAlign.rotCoords;
+//    		for(double[][] k : coor){
+//    			System.out.println("Sequence "+(n++)+"\n");
+//    			Funcs.printMatrix(k);
+//    		}
+//    		System.out.println("differences:\n");
+//    		n = 0; 
+//    		double[][][] diffs = structAlign.coordDiffs;
+//    		for(double[][] k : diffs){
+//    			System.out.println("Sequence "+(n++)+"\n");
+//    			Funcs.printMatrix(k);
+//    		}
+//    		
+//    		System.out.println("covariance matrix:\n");
+//    		double[][] covar = structAlign.fullCovar;
+//    		Funcs.printMatrix(covar);
+//    	}
+    	
 	
     }
     

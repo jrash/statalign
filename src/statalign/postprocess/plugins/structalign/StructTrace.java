@@ -1,6 +1,7 @@
 package statalign.postprocess.plugins.structalign;
 
 import java.awt.BorderLayout;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -13,21 +14,38 @@ import javax.swing.JPanel;
 
 import org.apache.commons.math3.geometry.euclidean.threed.Rotation;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
+import org.apache.commons.math3.linear.Array2DRowRealMatrix;
+import org.apache.commons.math3.linear.RealMatrix;
+import org.apache.commons.math3.linear.RealVector;
 
 import statalign.base.InputData;
 import statalign.base.McmcStep;
 import statalign.base.State;
 import statalign.base.Utils;
 import statalign.io.input.plugins.PDBReader;
+import statalign.mcmc.McmcModule;
 import statalign.mcmc.McmcMove;
 import statalign.model.ext.ModelExtManager;
 import statalign.model.ext.ModelExtension;
 import statalign.model.ext.plugins.StructAlign;
+import statalign.model.ext.plugins.structalign.Funcs;
 import statalign.postprocess.Postprocess;
 import statalign.postprocess.gui.StructAlignTraceGUI;
 
 
 public class StructTrace extends Postprocess {
+	
+	@Override 
+	public boolean createsMultipleOutputFiles() {
+		return true;
+	}
+	
+	@Override
+	public ArrayList<String> getAdditionalFileExtensions() {
+		ArrayList<String> result = new ArrayList<String>();
+		result.add("rot.coors");
+		return result;
+	}
 
 	List<StructAlignTraceParameters> parameterHistory;
 
@@ -123,12 +141,16 @@ public class StructTrace extends Postprocess {
 		if(!active)
 			return;
 		try {
+			outputFile.write("state\t");
 			for (McmcMove mcmcMove : structAlign.getMcmcMoves()) {
 				if (mcmcMove.getParam() != null) {
 					outputFile.write(mcmcMove.name+"\t");
 					//outputFile.write(mcmcMove.name+" (Proposed)\t");
 				}
 			}				
+			for(int i=0; i<structAlign.coords.length; i++)
+				outputFile.write("AxisX Seq"+i+"\tAxisY Seq"+i+"\tAxisZ Seq"+
+				i+"\tAngle Seq"+i+"\tTransX Seq"+i+"\tTransY Seq"+i+"\tTransZ Seq"+i+"\t");
 			outputFile.write("\n");
 		} catch (IOException e) {
 		}
@@ -151,9 +173,9 @@ public class StructTrace extends Postprocess {
 		count = 0;
 		
 	}
-	private void doUpdate(State state, int sampleNumber) {				
-		if (!state.isBurnin && state.logLike > maxLikelihood) {
-			maxLikelihood = state.logLike;			
+	private void doUpdate(McmcModule coreModel, State state, int sampleNumber) {				
+		if (!state.isBurnin && coreModel.curLogLike > maxLikelihood) {
+			maxLikelihood = coreModel.curLogLike;			
 			sampleNumberMLE = sampleNumber;
 			coorMLE = structAlign.rotCoords.clone();
 			if (seqs == null) { 
@@ -163,18 +185,19 @@ public class StructTrace extends Postprocess {
 		}
 	}
 	@Override
-	public void newPeek(State state) {
+	public void newPeek(McmcModule coreModel, State state) {
 		if (!active) return;
 		//if (show) {
-			doUpdate(state,0);
+			doUpdate(coreModel, state,0);
 		//}
 	}
 	@Override
-	public void newSample(State state, int no, int total) {
+	public void newSample(McmcModule coreModel, State state, int no, int total) {
 		if(!active)
 			return;
 		if(postprocessWrite) {
 			try {
+				outputFile.write(no+"\t");
 				for (McmcMove mcmcMove : structAlign.getMcmcMoves()) {
 					if (mcmcMove.getParam() != null) {
 						outputFile.write(mcmcMove.getParam().get()+"\t");
@@ -186,17 +209,66 @@ public class StructTrace extends Postprocess {
 //						}
 					}
 				}				
+				for(int i =0; i<structAlign.coords.length; i++){
+					for(int j = 0; j<structAlign.axes[i].length; j++)
+						outputFile.write(structAlign.axes[i][j]+"\t");
+					outputFile.write(structAlign.angles[i]+"\t");
+					for(int j = 0; j<structAlign.xlats[i].length; j++)
+						outputFile.write(structAlign.xlats[i][j]+"\t");
+				}
 				outputFile.write("\n");
+				double[][][] coor = structAlign.rotCoords;
+				if (coor.length == 2){
+					for(int i=0; i< coor.length;i++){
+						RealMatrix temp = new Array2DRowRealMatrix(coor[i]);
+						RealVector mean = Funcs.meanVectorAligned(temp,structAlign.curAlign,i);
+						for(int j = 0; j < coor[i].length; j++)
+							 coor[i][j]= temp.getRowVector(j).subtract(mean).toArray();
+					}
+				}
+				else
+					for(int i=0; i< coor.length;i++){
+						RealMatrix temp = new Array2DRowRealMatrix(coor[i]);
+						RealVector mean = Funcs.meanVector(temp);
+						for(int j = 0; j < coor[i].length; j++)
+							coor[i][j]= temp.getRowVector(j).subtract(mean).toArray();
+					}
+				additionalOutputFiles.get(0).write("sample" + no +"\n");
+				additionalOutputFiles.get(0).write("coordinates:\n");
+				int n = 0;
+				for(double[][] i : coor){
+					additionalOutputFiles.get(0).write("Sequence "+(n++)+"\n");
+					printMatrix(i, additionalOutputFiles.get(0));
+				}
+				additionalOutputFiles.get(0).write("differences:\n");
+				n = 0; 
+				double[][][] diffs = structAlign.coordDiffs;
+				for(double[][] i : diffs){
+					additionalOutputFiles.get(0).write("Sequence "+(n++)+"\n");
+					printMatrix(i, additionalOutputFiles.get(0));
+				}
+				
+				additionalOutputFiles.get(0).write("covariance matrix:\n");
+				double[][] covar = structAlign.fullCovar;
+				printMatrix(covar,additionalOutputFiles.get(0));
+				
+				String[] align = structAlign.curAlign;
+				additionalOutputFiles.get(0).write("current alignment:\n");
+				for(String x : align)
+					additionalOutputFiles.get(0).write(x+"\n");
+				
+				additionalOutputFiles.get(0).write("The structure loglikelihood is:\t" + structAlign.curLogLike+"\n");
 			} catch (IOException e) {
 				e.printStackTrace(); 
 			}
 			//structAlign.setAllMovesNotProposed();
 		}				
-		doUpdate(state,no);
+		doUpdate(coreModel, state,no);
 	}
 	
 	@Override
 	public void afterLastSample() {
+		double[][][] coor = structAlign.rotCoords;
 		if(!active)
 			return;
 		try {
@@ -207,19 +279,32 @@ public class StructTrace extends Postprocess {
 		if (coorMLE != null) {
 			try {
 				FileWriter mle = new FileWriter(getBaseFileName()+"mle.super.pdb");
+				if (coor.length == 2)
+					for(int i=0; i< coor.length;i++){
+						RealMatrix temp = new Array2DRowRealMatrix(coor[i]);
+						RealVector mean = Funcs.meanVectorAligned(temp,structAlign.curAlign,i);
+						for(int j = 0; j < coor[i].length; j++)
+							 coor[i][j]= temp.getRowVector(j).subtract(mean).toArray();
+					}
+				else
+					for(int i=0; i< coor.length;i++){
+						RealMatrix temp = new Array2DRowRealMatrix(coor[i]);
+						RealVector mean = Funcs.meanVector(temp);
+						for(int j = 0; j < coor[i].length; j++)
+							coor[i][j]= temp.getRowVector(j).subtract(mean).toArray();
+					}
+				System.out.println("Sample Number of MLE coor: " + sampleNumberMLE);
 				PDBReader.writePDB(coorMLE, seqs, names, mle);				
 				mle.close();
 			}catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
-
-
 		if(Utils.DEBUG) {
 			System.out.println("final rotation matrices:");
 			for(int i = 1; i < structAlign.xlats.length; i++) {
 				Rotation rot = new Rotation(new Vector3D(structAlign.axes[i]), structAlign.angles[i]);
-				printMatrix(rot.getMatrix());
+//				printMatrix(rot.getMatrix(),outputFile);
 			}
 			System.out.println("final translations:");
 			for(int i = 0; i < structAlign.xlats.length; i++) {
@@ -231,12 +316,14 @@ public class StructTrace extends Postprocess {
 				System.out.println(mcmcMove.name+"\t"+mcmcMove.acceptanceRate());
 			}
 		}
+		
+
 	}
 	
-	public static void printMatrix(double[][] m) {
+	public static void printMatrix(double[][] m, FileWriter outputFile) throws IOException {
 		for(int i = 0; i < m.length; i++)
-			System.out.println(Arrays.toString(m[i]));
-		System.out.println();
+			outputFile.write(Arrays.toString(m[i])+"\n");
+		outputFile.write("\n");
 	}
 	
 	@Override

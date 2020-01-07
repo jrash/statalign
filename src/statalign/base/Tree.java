@@ -275,7 +275,7 @@ public class Tree extends Stoppable implements DataType {
      * This constructor constructs a tree using a newick representation of the tree. It <b>does not</b>
      * construct its HMMs and substitution model!!!
      */
-    Tree(String descriptor) {
+    public Tree(String descriptor) {
         int numberofnodes = 1;
         for (int i = 0; i < descriptor.length(); i++) {
             if (descriptor.charAt(i) == ':') {

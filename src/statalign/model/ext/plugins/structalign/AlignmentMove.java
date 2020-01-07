@@ -10,6 +10,7 @@ import statalign.model.ext.plugins.StructAlign;
 
 public class AlignmentMove extends McmcMove {
 
+//	double acceptanceCountWithNoChange = 0;
 	Tree tree;
 	public StructAlignMoveParams moveParams = new StructAlignMoveParams();
 	
@@ -109,8 +110,14 @@ public class AlignmentMove extends McmcMove {
 //		if (lastMoveAccepted && subtreeRoot != tree.root) {						
 //			subtreeRoot.updateAlignedParent();
 //		}
-		//if (lastMoveAccepted && (owner.getLogLike() == oldll)) acceptanceCount--;
+//		if (name.equals("alignment") && lastMoveAccepted && (owner.getLogLike() == oldll)) acceptanceCount--;
+		
 	}
+//	@Override
+//	public double acceptanceRateWithNoChange(){
+//		System.out.println("Accept No Change: " + proposalCount);
+//		return (double) acceptanceCountWithNoChange / (double) proposalCount;
+//	}
 	@Override
 	public void afterFirstHalfBurnin() {
 		heat = secondHeat;

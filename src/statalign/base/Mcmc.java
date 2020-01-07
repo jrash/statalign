@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 import mpi.MPI;
 
@@ -285,6 +286,8 @@ public abstract class Mcmc extends Stoppable {
 	 */
 	public int doMCMC() {
 		
+		long startTime = System.currentTimeMillis();
+		
 		beforeMCMC();		
 		
 		MainFrame frame = postprocMan.mainManager.frame;
@@ -547,6 +550,16 @@ public abstract class Mcmc extends Stoppable {
 		if (frame != null) {
 			frame.statusText.setText(MainFrame.IDLE_STATUS_MESSAGE);
 		}
+		
+		long endTime   = System.currentTimeMillis();
+		long totalTime = endTime - startTime;
+		String timeString = String.format("%d min, %d sec", 
+			    TimeUnit.MILLISECONDS.toMinutes(totalTime),
+			    TimeUnit.MILLISECONDS.toSeconds(totalTime) - 
+			    TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(totalTime))
+			);
+		System.out.println("Total Time:\t" + timeString);
+		
 		return errorCode;
 	}
 
@@ -586,7 +599,7 @@ public abstract class Mcmc extends Stoppable {
 		try {
 			if (isMaster()) {
 				postprocMan.logFile.write(coreModel.getSummaryInfo() + "\n");
-				coreModel.printParameters();
+				coreModel.printParameters(no*total);
 			}
 		} catch (IOException e) {
 			if (postprocMan.mainManager.frame != null) {

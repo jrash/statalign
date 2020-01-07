@@ -108,6 +108,7 @@ public class LogLikelihoodTrace extends statalign.postprocess.Postprocess{
 		logLike[1] = coreModel.curLogLike;
 		if(postprocessWrite) {
 			try {						
+				outputFile.write(no*total+"\t");
 				outputFile.write(logLike[0]+"\t"+logLike[1]+"\n");				
 			} catch (IOException e) {
 				new ErrorMessage(null," "+e.getLocalizedMessage(),true);
@@ -158,6 +159,13 @@ public class LogLikelihoodTrace extends statalign.postprocess.Postprocess{
 	 */
 	@Override
 	public void beforeFirstSample(InputData input) {
+		
+		try {
+			outputFile.write("state\tllnoExtension\tllextension\n");
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		if(show) {
 			pan.removeAll();
 			gui = new LogLikelihoodTraceGUI(pan, this);

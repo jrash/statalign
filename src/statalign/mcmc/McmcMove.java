@@ -3,7 +3,9 @@ package statalign.mcmc;
 import statalign.base.Utils;
 
 public abstract class McmcMove {
-
+	
+	protected double acceptanceCountWithNoChange = 0;
+	
 	protected McmcModule owner;
 	public McmcModule getOwner() {
 		return owner;
@@ -52,6 +54,9 @@ public abstract class McmcMove {
 	public double acceptanceRate() {
 		return (double) acceptanceCount / (double) proposalCount;
 	}
+	public double acceptanceRateWithNoChange(){
+		return 0;
+	}
 	
 	public abstract void copyState(Object externalState);
 	public abstract double proposal(Object externalState); 
@@ -79,6 +84,7 @@ public abstract class McmcMove {
 			updateLikelihood(externalState);
 		}
 		if(isParamChangeAccepted(logProposalRatio)) {
+			acceptanceCountWithNoChange++;
 			acceptanceCount++;
 			lastMoveAccepted = true;
 		}

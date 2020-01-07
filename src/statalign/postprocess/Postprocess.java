@@ -126,7 +126,7 @@ public abstract class Postprocess {
 	/**
 	 * This is the output file writer, that is written by a specific postprocess.
 	 */
-	public FileWriter outputFile;
+	public  FileWriter outputFile;
 		
 	/**
 	 * Optional array for additional output files.
@@ -251,6 +251,8 @@ public abstract class Postprocess {
 	public void newPeek(State state) {
 	}
 	
+	public void newPeek(McmcModule coreModel, State state) {
+	}
 	/**
 	 * 
 	 * This function is called when we sample from the Markov chain. Frequency is determined
@@ -302,5 +304,6 @@ public abstract class Postprocess {
 	public boolean createsMultipleOutputFiles() {
 		return false;
 	}
+
 
 }

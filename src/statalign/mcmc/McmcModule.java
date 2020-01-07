@@ -96,6 +96,7 @@ public abstract class McmcModule {
 		for (McmcMove mcmcMove : mcmcMoves) {
 			mcmcMove.proposalCount = 0;
 			mcmcMove.acceptanceCount = 0;
+			mcmcMove.acceptanceCountWithNoChange = 0;
 			mcmcMove.lowCounts = 0;
 		}
 	}
@@ -111,13 +112,31 @@ public abstract class McmcModule {
 		String info = "";
 		for (McmcMove mcmcMove : mcmcMoves) {
 			String infoFormat = "%-24s%8s%8d%8d%8.4f%8.4f\n";
-			info += String.format(Locale.US, infoFormat,
-					mcmcMove.name,
-					Utils.convertTime(mcmcMove.getTime()),
-					mcmcMove.proposalCount,
-					mcmcMove.getTime()/(mcmcMove.proposalCount>0 ? mcmcMove.proposalCount : 1),
-					mcmcMove.acceptanceRate(),
-					mcmcMove.proposalWidthControlVariable);
+			if(mcmcMove.name.contains("Alignment_")){
+				info += String.format(Locale.US, infoFormat,
+						mcmcMove.name,
+						Utils.convertTime(mcmcMove.getTime()),
+						mcmcMove.proposalCount,
+						mcmcMove.getTime()/(mcmcMove.proposalCount>0 ? mcmcMove.proposalCount : 1),
+						mcmcMove.acceptanceRate(),
+						mcmcMove.proposalWidthControlVariable);
+				info += String.format(Locale.US, infoFormat,
+						mcmcMove.name+"NoChange",
+						Utils.convertTime(mcmcMove.getTime()),
+						mcmcMove.proposalCount,
+						mcmcMove.getTime()/(mcmcMove.proposalCount>0 ? mcmcMove.proposalCount : 1),
+						mcmcMove.acceptanceRateWithNoChange(),
+						mcmcMove.proposalWidthControlVariable);
+			}
+			else{
+				info += String.format(Locale.US, infoFormat,
+						mcmcMove.name,
+						Utils.convertTime(mcmcMove.getTime()),
+						mcmcMove.proposalCount,
+						mcmcMove.getTime()/(mcmcMove.proposalCount>0 ? mcmcMove.proposalCount : 1),
+						mcmcMove.acceptanceRate(),
+						mcmcMove.proposalWidthControlVariable);
+			}
 		}
 		return info;
 	}
@@ -128,17 +147,18 @@ public abstract class McmcModule {
 		}
 		return info;
 	}
-	public void printParameters() {		
+	public void printParameters(int state) {		
 		if (logParametersToFile) {
 			String params = "";
 			for (McmcMove m : mcmcMoves) {			
 				if (m.printableParam) {
-					if (params != "") params += ", ";
+					if (params != "") params += "\t";
 					params += m.getParameterString();			
 				}
 			}
 			if (params != null) {
 				try {
+					parameterLog.write(state+"\t");
 					parameterLog.write(params+"\n");
 				}
 				catch (IOException e) {
@@ -157,13 +177,14 @@ public abstract class McmcModule {
 			String paramNames = "";
 			for (McmcMove m : mcmcMoves) {			
 				if (m.printableParam) {
-					if (paramNames != "") paramNames += ", ";
+					if (paramNames != "") paramNames += "\t";
 					paramNames += m.getNameString();
 				}
 			}
 			if (paramNames != null) {
 				try {
 					if (parameterLog == null) System.out.println("null log");
+					parameterLog.write("state\t");
 					parameterLog.write(paramNames+"\n");
 				}
 				catch (IOException e) {

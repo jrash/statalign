@@ -6,7 +6,10 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 import javax.swing.ImageIcon;
 import javax.swing.JComponent;
@@ -59,6 +62,9 @@ import statalign.utils.LinkFunction;
 
 public class StructAlign extends ModelExtension implements ActionListener {
 	
+	
+	public double[][][] coordDiffs;
+	
 	/** The command line identifier of this plugin */
 	//private static final String CMD_LINE_PLUGIN_ID = "structal";
 	private final String pluginID = "structal";	
@@ -75,6 +81,7 @@ public class StructAlign extends ModelExtension implements ActionListener {
 	public boolean useLibrary = false;
 	public boolean fixedEpsilon = false;
 	public boolean fixedSigma2 = false;
+	public boolean fixedTranslation = true;
 	
 	/** 
 	 *  If globalSigma = false then this switches on a spike prior at sigma2Hier. 
@@ -254,12 +261,35 @@ public class StructAlign extends ModelExtension implements ActionListener {
 		activateAssociatedPlugins();
 	}
 	
+	private static void printMatrix(double[][] ls) {
+
+		for (int i = 0; i < ls.length; i++) {
+			for (int j = 0; j < ls[i].length; j++) {
+				System.out.print(ls[i][j] + "\t");
+			}
+			System.out.println();
+		}
+
+	}
+	
+	//Converts an Integer arraylist to an int array
+	public static int[] convertIntegers(List<Integer> integers)
+	{
+	    int[] ret = new int[integers.size()];
+	    Iterator<Integer> iterator = integers.iterator();
+	    for (int i = 0; i < ret.length; i++)
+	    {
+	        ret[i] = iterator.next().intValue();
+	    }
+	    return ret;
+	}
+	
 
 	@Override
 	public String getUsageInfo() {
 		StringBuilder usage = new StringBuilder();
 		usage.append("___________________________\n\n");
-		usage.append("  StructAlign version 1.1\n\n");
+		usage.append("  StructAlign version 1.0\n\n");
 		usage.append("^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\n");
 		usage.append("java -jar statalign.jar -plugin:structal[OPTION1,OPTION2,...]\n");
 		usage.append("OPTIONS: \n");
@@ -659,9 +689,6 @@ public class StructAlign extends ModelExtension implements ActionListener {
 		RotationMove rotationMove = new RotationMove(this,"rotation"); 
 		addMcmcMove(rotationMove,rotationWeight); 
 		
-		TranslationMove translationMove = new TranslationMove(this,"translation");
-		addMcmcMove(translationMove,translationWeight); 
-		
 		LibraryMove libraryMove = null;
 		if (useLibrary) {
 			libraryMove = new LibraryMove(this,"library");
@@ -678,14 +705,19 @@ public class StructAlign extends ModelExtension implements ActionListener {
 			alignmentRotation.add(rotationMove);
 			McmcCombinationMove alignmentRotationMove = 
 				new McmcCombinationMove(alignmentRotation);
-			addMcmcMove(alignmentRotationMove,alignmentRotationWeight); 
+			addMcmcMove(alignmentRotationMove,alignmentRotationWeight);
 			
-			ArrayList<McmcMove> alignmentTranslation = new ArrayList<McmcMove>(); 
-			alignmentTranslation.add(alignmentMove);
-			alignmentTranslation.add(translationMove);
-			McmcCombinationMove alignmentTranslationMove = 
-				new McmcCombinationMove(alignmentTranslation);
-			addMcmcMove(alignmentTranslationMove,alignmentTranslationWeight);
+			if(!fixedTranslation){
+				TranslationMove translationMove = new TranslationMove(this,"translation");
+				addMcmcMove(translationMove,translationWeight);
+				
+				ArrayList<McmcMove> alignmentTranslation = new ArrayList<McmcMove>(); 
+				alignmentTranslation.add(alignmentMove);
+				alignmentTranslation.add(translationMove);
+				McmcCombinationMove alignmentTranslationMove = 
+					new McmcCombinationMove(alignmentTranslation);
+				addMcmcMove(alignmentTranslationMove,alignmentTranslationWeight);
+			}
 				
 			if (useLibrary) { 
 				ArrayList<McmcMove> alignmentLibrary = new ArrayList<McmcMove>();
@@ -825,8 +857,10 @@ public class StructAlign extends ModelExtension implements ActionListener {
 		}
 	}
 	public void afterBurnin() {
-		nuMove.alwaysSample();
-		nuMove.setMinValue(0.001);
+		if(nuMove!=null){
+			nuMove.alwaysSample();
+			nuMove.setMinValue(0.001);
+		}
 	}
 	
 	public double computeLogLikeFactor(Tree tree) {
@@ -867,19 +901,272 @@ public class StructAlign extends ModelExtension implements ActionListener {
 		return curLogLike;
 	}
 	
-	public double calcAllColumnContrib() {
+	/**
+	 * Calculates the structural likelihood contribution of a single alignment column
+	 * @param col the column, id of the residue for each sequence (or -1 if gapped in column)
+	 * @return the likelihood contribution
+	 */		
+	public double columnContrib(int[] _col) {
+		// count the number of ungapped positions in the column
+		int numMatch = 0;
+		int[] col = _col.clone();
+		for(int i = 0; i < col.length; i++){
+			if (col[i]==0) col[i] = -1;
+		}
+		for(int i = 0; i < col.length; i++){
+			if (coords[i]==null) col[i] = -1;	
+			if(col[i]!=-1)
+				numMatch++;
+		}
+		if(numMatch == 0) 
+			return 0;
+		// collect indices of ungapped positions
+		int[] notgap = new int[numMatch];
+		int columnCode = 0;
+		int j = 0;		
+		for(int i = 0; i < col.length; i++)  {
+			if(col[i]!=-1) {
+				notgap[j++] = i;
+				columnCode |= (1 << i); 
+				/*if this column has exactly the same indel pattern/column code, the alignment has not changed, and 
+				 * can reuse the cholesky decompositions - doesnt matter what column you are in, only matters if you have 
+				 * same number of amino acids in a column (same number of means and same size of covariance matrix)
+				 */
+			}						
+		}
+		
+		/*		 
+		 * Under localEpsilon mode, the covariance depends on the column,
+		 * not just the indel pattern of the column, but we can still
+		 * cache the Cholesky decompositions to be re-used for columns
+		 * that do not change (since most of the alignment columns do 
+		 * not change during an alignment move, this could still yield
+		 * a significant speedup).
+		 */			
+		
+		MultiNormCholesky multiNorm = null;
+		if (localEpsilon) multiNorm = multiNormsLocal.get(new Column(col));
+		else multiNorm = multiNorms.get(columnCode);				
+		MultiNormCholesky multiNorm2 = null;
+		if (Utils.DEBUG){
+			double[][] subCovar = Funcs.getSubMatrix(fullCovar, notgap, notgap);
+			// create normal distribution with mean 0 and covariance subCovar
+			if (localEpsilon) addLocalEpsilonToDiagonal(subCovar,notgap,col);
+			multiNorm2 = new MultiNormCholesky(new double[numMatch], subCovar);
+		}
+		
+		if (multiNorm == null) {
+			// extract covariance corresponding to ungapped positions
+			double[][] subCovar = Funcs.getSubMatrix(fullCovar, notgap, notgap);
+			if (localEpsilon) addLocalEpsilonToDiagonal(subCovar,notgap,col);
+			// create normal distribution with mean 0 and covariance subCovar
+			multiNorm = new MultiNormCholesky(new double[numMatch], subCovar);
+			if (localEpsilon) multiNormsLocal.put(new Column(col), multiNorm);
+			else multiNorms.put(columnCode, multiNorm);
+		}		
+			
+		double logli = 0;
+		double[] vals = new double[numMatch];
+		double aa1;
+		double aa2;
+				
+		// loop over all 3 coordinates
+		for(j = 0; j < 3; j++){
+			for(int i = 0; i < numMatch; i++) {
+				aa1 = rotCoords[notgap[i]][col[notgap[i]]][j];
+				aa2 = rotCoords[notgap[i]][col[notgap[i]]-1][j];
+				vals[i] =  coordDiffs[notgap[i]][col[notgap[i]]-1][j] = aa1-aa2;
+			}
+			
+			if (Utils.DEBUG  && multiNorm.logDensity(vals) != multiNorm2.logDensity(vals)) {
+				System.out.print("col = [");
+				for (int k=0; k<col.length; k++) System.out.print(col[k]+",");
+				System.out.println("] ("+columnCode+")");
+				for (int key : multiNorms.keySet()) {
+					if (multiNorms.get(key).getMeans().length==vals.length) {
+						System.out.println(key+" "+multiNorms.get(key).logDensity(vals));
+					}
+				}
+				throw new RuntimeException(
+						"Inconsistency: "+multiNorm.logDensity(vals)+" != "
+						+multiNorm2.logDensity(vals));
+			}
+			
+			logli += multiNorm.logDensity(vals);
+		}
+		return logli;
+	}
+	
+	/**
+	 * Calculates the structural likelihood contribution of a single alignment column
+	 * @param col the column, id of the residue for each sequence (or -1 if gapped in column)
+	 * @return the likelihood contribution
+	 */		
+	public double columnContribBondAlign(int[] col, String[] align) {
+		
+//		System.out.println(Arrays.toString(col));
+//		for (String st : align)
+//			System.out.println(st);
+		
+		int bondLen = 0;
+		double logli = 0;
+//		int[] inds = new int[col.length];		// current char indices
+		ArrayList<Integer> bondLens = new ArrayList<Integer>();
+			
+		for (int seq = 0; seq < col.length; seq++) {
+			if(col[seq] == -1){
+				bondLens.add(0);
+				continue;
+			}
+			int alignIdx = -1;
+			int aaIdx = -1;
+			while(aaIdx != col[seq]){
+				alignIdx++;
+				if (align[seq].charAt(alignIdx) != '-')
+					aaIdx++;
+			}
+//			System.out.println(aaIdx + " aa");
+//			System.out.println(alignIdx + " align");
+			if (alignIdx == 0){
+				bondLens.add(0);
+				continue;
+			}
+			else{
+			//If there is an amino acid in the column, increase the bond length count until you find 
+			//the preceding amino acid (or the beginning of the sequence)
+				bondLen = 1;
+				int i = alignIdx - 1;
+				while (i != -1 && align[seq].charAt(i) == '-') {
+					bondLen++;
+					i--;
+				}
+				//If there is a bond length estimated across the 5' terminal gap, erase it
+				//i == 0 can not be used for the "beginning of the sequence" because if there are amino 
+				//acids in the first two columns The second amino acid will have a bond length we want to save and i == 0
+				if(i == -1){
+					bondLens.add(0);
+					continue;
+				}
+				bondLens.add(bondLen);
+			}
+		}
+		//create a set of all the unique bond lens
+		Set<Integer> uniqBonds = new HashSet<Integer>();
+		uniqBonds.addAll(bondLens);
+		//remove 0 bond lengths (correspond to gaps in the current column)
+		uniqBonds.remove(0);
+		
+		int[] bondLensArr = convertIntegers(bondLens);
+		
+		if(uniqBonds.size() == 0)
+			return 0;
+		
+		ArrayList<Integer> indices = new ArrayList<Integer>();
+		
+		for(int bond : uniqBonds){
+//			System.out.println("bond length:\t"+bond);
+			for(int i = 0; i< bondLensArr.length; i++){
+				if (bondLensArr[i] == bond)
+					indices.add(i);
+			}
+//			create array with sequences with this bond length
+			int[] seqs = convertIntegers(indices);
+//			System.out.println("Seqs with bond length:\t"+Arrays.toString(seqs));
+			
+			//for every seq with a bond length in this column, do a bitshift operation
+			int j = 0;
+			int columnCode = 0;
+//			System.out.println(Arrays.toString(seqs));
+			for(int i = 0; i < bondLensArr.length; i++)  {
+				if(j < seqs.length && seqs[j]==i){
+					columnCode |= (1 << i);
+					j++;
+				}
+					/*integers are 32 bit, meaning there are  2^32 unique codes, 
+					is it possible to create duplicate codes for different indel patterns?*/
+			}
+//			System.out.println("column code:\t"+columnCode);
+			indices.clear();
+				/*
+				 * if this column has exactly the same indel pattern/column
+				 * code, can reuse the
+				 * cholesky decompositions - doesnt matter what column you are
+				 * in, only matters if you have same sequences with amino acids in a
+				 * column (same number of means and same subset of covariance
+				 * matrix)
+				 */
+
+		/*
+		 * Under localEpsilon mode, the covariance depends on the column, not
+		 * just the indel pattern of the column, but we can still cache the
+		 * Cholesky decompositions to be re-used for columns that do not change
+		 * (since most of the alignment columns do not change during an
+		 * alignment move, this could still yield a significant speedup).
+		 */
+	
+			MultiNormCholesky multiNorm = null;
+			if(multiNorms.get(columnCode) != null)
+				multiNorm = multiNorms.get(columnCode);
+	
+			if (multiNorm == null) {
+				// extract covariance corresponding to ungapped positions
+				double[][] subCovar = Funcs.getSubMatrix(fullCovar, seqs, seqs);
+//				System.out.println(subCovar.length +","+ subCovar[0].length);
+				// create normal distribution with mean 0 and covariance subCovar
+				multiNorm = new MultiNormCholesky(new double[seqs.length], subCovar);
+				multiNorms.put(columnCode, multiNorm);
+			}
+			
+//			System.out.println(multiNorms.get(columnCode));
+			
+			double[] vals = new double[seqs.length];
+			double aa1;
+			double aa2;
+			
+			// loop over all 3 coordinates and calculate AA distances
+			for (j = 0; j < 3; j++) {
+				for (int k = 0; k < seqs.length; k++){
+					aa1 = rotCoords[seqs[k]][col[seqs[k]]][j];
+					aa2 = rotCoords[seqs[k]][col[seqs[k]]-1][j];
+					vals[k] =  coordDiffs[seqs[k]][col[seqs[k]]-1][j] = aa1-aa2;
+				}
+//				System.out.println(Arrays.toString(vals));
+//				System.out.println("Coordinate"+(j+1)+" log likelihood:\t "+multiNorm.logDensity(vals));
+				logli += multiNorm.logDensity(vals);
+			}
+
+//			for (int k = 0; k < seqs.length; k++){
+//				for (j = 0; j < 3; j++) {
+//					aa1 = rotCoords[seqs[k]][col[seqs[k]]][j];
+//					aa2 = rotCoords[seqs[k]][col[seqs[k]]+1][j];
+//					coordDiffs[seqs[k]][col[seqs[k]]][j] = aa2-aa1;
+//				}
+//			}
+		}
+		return logli;
+	}
+	
+	
+public double calcAllColumnContrib() {
+		
 		String[] align = curAlign;
+		coordDiffs = new double[rotCoords.length][][];
+		for(int i = 0; i < rotCoords.length; i++)
+			coordDiffs[i] = new double[rotCoords[i].length-1][3];
 		double logli = 0;
 		int[] inds = new int[align.length];		// current char indices
 		int[] col = new int[align.length];  
 		for(int i = 0; i < align[refIndex].length(); i++) {
 			for(int j = 0; j < align.length; j++)
+				//Find the index of the amino acid in the sequence in the current
+				//column.  Do this so you know which amino acid's coordinates to use later on
 				col[j] = align[j].charAt(i) == '-' ? -1 : inds[j]++;
-			double ll = columnContrib(col); 
+			double ll = columnContribBondAlign(col, align); 
 			logli += ll;
 		}
 		return structTemp * logli;
-	}
+		
+	}	
 	// TODO Change visibility of this to package, after moving
 	// StructAlign.java to statalign.model.ext.plugins.structalign
 
@@ -937,90 +1224,7 @@ public class StructAlign extends ModelExtension implements ActionListener {
 			throw new Error("Inconsistency in StructAlign, log-likelihood "+logli+" vs "+curLogLike);
 		return true;
 	}
-	
-	/**
-	 * Calculates the structural likelihood contribution of a single alignment column
-	 * @param col the column, id of the residue for each sequence (or -1 if gapped in column)
-	 * @return the likelihood contribution
-	 */		
-	public double columnContrib(int[] _col) {
-		// count the number of ungapped positions in the column
-		int numMatch = 0;
-		int[] col = _col.clone();
-		for(int i = 0; i < col.length; i++){
-			if (coords[i]==null) col[i] = -1;	
-			if(col[i]!=-1)
-				numMatch++;
-		}
-		if(numMatch == 0) 
-			return 0;
-		// collect indices of ungapped positions
-		int[] notgap = new int[numMatch];
-		int columnCode = 0;
-		int j = 0;		
-		for(int i = 0; i < col.length; i++)  {
-			if(col[i]!=-1) {
-				notgap[j++] = i;
-				columnCode |= (1 << i);
-			}						
-		}
-		
-		/*		 
-		 * Under localEpsilon mode, the covariance depends on the column,
-		 * not just the indel pattern of the column, but we can still
-		 * cache the Cholesky decompositions to be re-used for columns
-		 * that do not change (since most of the alignment columns do 
-		 * not change during an alignment move, this could still yield
-		 * a significant speedup).
-		 */			
-		
-		MultiNormCholesky multiNorm = null;
-		if (localEpsilon) multiNorm = multiNormsLocal.get(new Column(col));
-		else multiNorm = multiNorms.get(columnCode);				
-		MultiNormCholesky multiNorm2 = null;
-		if (Utils.DEBUG){
-			double[][] subCovar = Funcs.getSubMatrix(fullCovar, notgap, notgap);
-			// create normal distribution with mean 0 and covariance subCovar
-			if (localEpsilon) addLocalEpsilonToDiagonal(subCovar,notgap,col);
-			multiNorm2 = new MultiNormCholesky(new double[numMatch], subCovar);
-		}
-		
-		if (multiNorm == null) {
-			// extract covariance corresponding to ungapped positions
-			double[][] subCovar = Funcs.getSubMatrix(fullCovar, notgap, notgap);
-			if (localEpsilon) addLocalEpsilonToDiagonal(subCovar,notgap,col);
-			// create normal distribution with mean 0 and covariance subCovar
-			multiNorm = new MultiNormCholesky(new double[numMatch], subCovar);
-			if (localEpsilon) multiNormsLocal.put(new Column(col), multiNorm);
-			else multiNorms.put(columnCode, multiNorm);
-		}		
-			
-		double logli = 0;
-		double[] vals = new double[numMatch];
-				
-		// loop over all 3 coordinates
-		for(j = 0; j < 3; j++){
-			for(int i = 0; i < numMatch; i++) 
-				vals[i] = rotCoords[notgap[i]][col[notgap[i]]][j];
-			
-			if (Utils.DEBUG  && multiNorm.logDensity(vals) != multiNorm2.logDensity(vals)) {
-				System.out.print("col = [");
-				for (int k=0; k<col.length; k++) System.out.print(col[k]+",");
-				System.out.println("] ("+columnCode+")");
-				for (int key : multiNorms.keySet()) {
-					if (multiNorms.get(key).getMeans().length==vals.length) {
-						System.out.println(key+" "+multiNorms.get(key).logDensity(vals));
-					}
-				}
-				throw new RuntimeException(
-						"Inconsistency: "+multiNorm.logDensity(vals)+" != "
-						+multiNorm2.logDensity(vals));
-			}
-			
-			logli += multiNorm.logDensity(vals);
-		}
-		return logli;
-	}
+
 	
 	private void addLocalEpsilonToDiagonal(double[][] subCovar, int[] notgap, int[] col) {		
 		for (int i=0; i<notgap.length; i++) {
@@ -1028,7 +1232,7 @@ public class StructAlign extends ModelExtension implements ActionListener {
 		}
 	}
 
-	private class Column {
+	public class Column {
 		public int[] col;
 		Column(int[] x) {
 			col = x.clone();
@@ -1094,8 +1298,10 @@ public class StructAlign extends ModelExtension implements ActionListener {
 		// by theta_i = sigma_i^2 / (2 tau)
 		if(globalSigma){
 			for(int i = 0; i < tree.names.length; i++)
-				for(int j = i; j < tree.names.length; j++)
+				for(int j = i; j < tree.names.length; j++){
 					covar[j][i] = covar[i][j] = tau * Math.exp(-linkFunction.f(distanceMatrix[i][j]) * sigma2[0] / (2*tau));
+//					System.out.println(covar[j][i]);
+				}
 		} else{
 			for(int i = 0; i < tree.names.length; i++)
 				for(int j = i; j < tree.names.length; j++)
@@ -1207,11 +1413,31 @@ public class StructAlign extends ModelExtension implements ActionListener {
 	public void beforeAlignChange(Tree tree, Vertex selectRoot) {
 		oldAlign = curAlign;
 		oldLogLi = curLogLike;
+		if (Utils.DEBUG){
+			System.out.println("The structure loglikelihood is:\t" + curLogLike);
+		}
 	}
 	@Override
 	public double logLikeAlignChange(Tree tree, Vertex selectRoot) {
 		curAlign = tree.getState().getLeafAlign();
 		curLogLike = calcAllColumnContrib();
+		if (Utils.DEBUG){
+			System.out.println("The structure loglikelihood is:\t" + curLogLike);
+			System.out.println("coordinates:\n");
+			int n = 0;
+			for(double[][] k : rotCoords){
+				System.out.println("Sequence "+(n++)+"\n");
+				Funcs.printMatrix(k);
+			}
+			System.out.println("differences:\n");
+			n = 0; 
+			for(double[][] k : coordDiffs){
+				System.out.println("Sequence "+(n++)+"\n");
+				Funcs.printMatrix(k);
+			}
+			System.out.println("covariance matrix:\n");
+			Funcs.printMatrix(fullCovar);
+		}
 		return curLogLike;
 	}
 	

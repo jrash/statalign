@@ -220,7 +220,6 @@ public class InputGUI extends JPanel implements ActionListener, ListSelectionLis
 					}
 				}
 			}
-			manager.inputData.auxData.clear();
 			manager.inputData.seqs.clear();			
 			manager.deactivateRNA();
 			dlmSequences.clear();

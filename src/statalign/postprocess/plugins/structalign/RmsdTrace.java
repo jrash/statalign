@@ -14,9 +14,13 @@ import javax.swing.JPanel;
 
 import org.apache.commons.math3.geometry.euclidean.threed.Rotation;
 import org.apache.commons.math3.geometry.euclidean.threed.Vector3D;
+import org.apache.commons.math3.linear.Array2DRowRealMatrix;
+import org.apache.commons.math3.linear.RealMatrix;
+import org.apache.commons.math3.linear.RealVector;
 import org.apache.commons.math3.util.Pair;
 
 import statalign.base.InputData;
+import statalign.base.MCMCPars;
 import statalign.base.McmcStep;
 import statalign.base.State;
 import statalign.base.Utils;
@@ -24,6 +28,7 @@ import statalign.mcmc.McmcMove;
 import statalign.model.ext.ModelExtManager;
 import statalign.model.ext.ModelExtension;
 import statalign.model.ext.plugins.StructAlign;
+import statalign.model.ext.plugins.structalign.Funcs;
 import statalign.postprocess.Postprocess;
 import statalign.postprocess.Track;
 import statalign.postprocess.gui.StructAlignTraceGUI;
@@ -33,9 +38,27 @@ import statalign.postprocess.plugins.MpdAlignment;
 
 public class RmsdTrace extends Postprocess {
 
+	public int samples;
+	public int cycles;
+
+	@Override 
+	public boolean createsMultipleOutputFiles() {
+		return true;
+	}
+	
+	@Override
+	public ArrayList<String> getAdditionalFileExtensions() {
+		ArrayList<String> result = new ArrayList<String>();
+		result.add("cont.prob");
+		return result;
+	}
+	
+	public MCMCPars mcmcpars;
 	
 	public StructAlign structAlign;
-		
+	
+	public double[][] contactProb;
+	
 	/** For adding to the MPD alignment panel in the GUI. */
 	Track rmsdTrack = new Track(Color.RED, new double[1]);
 	Track bFactorTrack = new Track(Color.GREEN, new double[1]);
@@ -109,6 +132,8 @@ public class RmsdTrace extends Postprocess {
 //				structAlign = (StructAlign) modExt;
 //			}
 //		}	
+		contactProb = new double[structAlign.rotCoords[0].length][structAlign.rotCoords[1].length];
+		
 		if(!active)	return;		
 		input = inputData;
 		
@@ -116,9 +141,10 @@ public class RmsdTrace extends Postprocess {
 		if(postprocessWrite) {
 		int leaves = structAlign.coords.length;
 		try {
-			outputFile.write("# Each row contains pairwise mean-square deviations (msd_ij)\n");
+			outputFile.write("state\t");
+/*			outputFile.write("# Each row contains pairwise mean-square deviations (msd_ij)\n");
 			outputFile.write("# branch length distances (t_ij), and sequence identities (seqID_ij)\n");
-			outputFile.write("# for each MCMC sample.\n");			
+			outputFile.write("# for each MCMC sample.\n");	*/		
 			for(int i = 0; i < leaves-1; i++)
 				for(int j = i+1; j < leaves; j++)
 					outputFile.write("msd" + i + "_" + j + "\t");
@@ -169,13 +195,15 @@ public class RmsdTrace extends Postprocess {
 	}
 	@Override
 	public void newSample(State state, int no, int total) {
+		samples = total;
 		if(!active)
 			return;
 		if(postprocessWrite) {
 			double[][] msd = calcMSD();
-			double[][] seqID = calcSeqID();			
-			
+			double[][] seqID = calcSeqID();	
+			calcContactProb(samples);
 			try {
+				outputFile.write(no*total+"\t");
 				for(int i = 0; i < msd.length-1; i++)
 					for(int j = i+1; j < msd.length; j++)
 						outputFile.write(msd[i][j] + "\t");
@@ -201,7 +229,16 @@ public class RmsdTrace extends Postprocess {
 			return;		
 		if(postprocessWrite) {
 		try {
-			outputFile.close();			
+			if(structAlign.rotCoords.length == 2){
+				for(int i=0; i<contactProb.length; i++){
+					for(int j=0; j<contactProb[0].length; j++)
+						contactProb[i][j] /= samples;
+				}
+				printMatrix(contactProb, additionalOutputFiles.get(0));
+			}
+			outputFile.close();
+			additionalOutputFiles.get(0).close();
+			
 		} catch (IOException e) {
 			e.printStackTrace();
 		}				
@@ -247,9 +284,29 @@ public class RmsdTrace extends Postprocess {
 		System.out.println();
 	}
 	
+	public static void printMatrix(double[][] m, FileWriter outputFile) throws IOException {
+		for(int i = 0; i < m.length; i++)
+			outputFile.write(Arrays.toString(m[i])+"\n");
+		outputFile.write("\n");
+	}
+	
 	public double[][] calcMSD(){
 		double[][][] coor = structAlign.rotCoords;
 		String[] align = structAlign.curAlign;
+		if (coor.length == 2)
+			for(int i=0; i< coor.length;i++){
+				RealMatrix temp = new Array2DRowRealMatrix(coor[i]);
+				RealVector mean = Funcs.meanVectorAligned(temp,align,i);
+				for(int j = 0; j < coor[i].length; j++)
+					 coor[i][j]= temp.getRowVector(j).subtract(mean).toArray();
+			}
+		else
+			for(int i=0; i< coor.length;i++){
+				RealMatrix temp = new Array2DRowRealMatrix(coor[i]);
+				RealVector mean = Funcs.meanVector(temp);
+				for(int j = 0; j < coor[i].length; j++)
+					coor[i][j]= temp.getRowVector(j).subtract(mean).toArray();
+			}
 		int leaves = coor.length;
 		boolean[] hasStructure = new boolean[leaves];		
 		boolean igap, jgap;
@@ -273,8 +330,7 @@ public class RmsdTrace extends Postprocess {
 				msd[i][j] /= n;
 			}
 		}
-		return msd;
-	}
+		return msd;	}
 	public void updateTracks(String[] align){
 		double[][][] coor = structAlign.rotCoords;
 		int leaves = coor.length;
@@ -392,6 +448,23 @@ public class RmsdTrace extends Postprocess {
 			}
 		}
 		return seqID;
+	}
+	
+	public void calcContactProb(int total){
+		String[] align = structAlign.curAlign;
+		boolean ngap, mgap;
+		int aaIdxN = 0, aaIdxM = 0;
+		for(int k = 0; k < align[0].length(); k++){
+			ngap = align[0].charAt(k) == '-';
+			mgap = align[1].charAt(k) == '-';
+			if(!ngap & !mgap){
+				contactProb[aaIdxN][aaIdxM]++;
+			}
+			if(!ngap)
+				aaIdxN++;
+			if(!mgap)
+				aaIdxM++;
+		}
 	}
 
 

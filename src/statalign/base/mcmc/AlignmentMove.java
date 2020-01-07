@@ -8,6 +8,8 @@ import statalign.mcmc.McmcMove;
 
 public class AlignmentMove extends McmcMove {
 
+//	double acceptanceCountWithNoChange = 0;
+	
 	Tree tree = null;
 	Vertex selectedRoot;
 	double[] weights;
@@ -147,7 +149,11 @@ public class AlignmentMove extends McmcMove {
 	public void afterMove(Object externalState) {
 		((CoreMcmcModule) owner).getModelExtMan().afterAlignChange(tree, selectedRoot,lastMoveAccepted);
 		if (lastMoveAccepted && (owner.curLogLike == oldll)) acceptanceCount--;
-				
+		if (lastMoveAccepted){
+		System.out.println("Accept Change: " + acceptanceCount);
+		System.out.println("Accept No Change: " + acceptanceCountWithNoChange);
+		}
+		
 		if (!useModelExtInProposal) {			
 			Utils.USE_MODEXT_EM = useModextEm;			
 			Utils.USE_MODEXT_UPP = useModextUpp;
@@ -163,6 +169,10 @@ public class AlignmentMove extends McmcMove {
 		if (Utils.DEBUG && Utils.USE_MODEXT_EM) {
 			tree.root.updateAlignedRecursivelyWithCheck();			
 		}
+	}
+	@Override
+	public double acceptanceRateWithNoChange(){
+		return (double) acceptanceCountWithNoChange / (double) proposalCount;
 	}
 	
 	@Override
