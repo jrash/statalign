@@ -1,4 +1,14 @@
-StatAlign v3.2
+## Modifications to StructAlign
+
+The modification to StructAlign which improved the biological realism of insertion and deletion in the Bayesian model for the joint estimation of phylogeny and protein structure alignment.  Group project with Jeff Thorne (NCSU), Gary Larson and Scott Schmidler (Duke), Jotun Hein (Oxford) hosted by The Statistical and Applied Mathematical Sciences Institute.
+
+The primary change to the model is in `StructAlign.java` [here](https://github.com/jrash/statalign/commit/32e645402402e51a8eecc00961dbcb4267726b4e#diff-6e719fecae530ef5ffeee9fa7ab2368d).
+
+A write up of the original model is described in the original [paper](https://academic.oup.com/mbe/article/31/9/2251/2925747). 
+
+`Herman_et_al_improved_insertion` contains write up of our modification to the model.
+
+## StatAlign v3.2
 
 http://statalign.github.io/
  
