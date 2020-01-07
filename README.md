@@ -1,4 +1,4 @@
-## Modifications to StructAlign
+## Improvement of the biological realism of insertion and deletion in StructAlign
 
 The modification to StructAlign which improved the biological realism of insertion and deletion in the Bayesian model for the joint estimation of phylogeny and protein structure alignment.  Group project with Jeff Thorne (NCSU), Gary Larson and Scott Schmidler (Duke), Jotun Hein (Oxford) hosted by The Statistical and Applied Mathematical Sciences Institute.
 
